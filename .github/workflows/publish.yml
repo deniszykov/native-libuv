@@ -1,0 +1,60 @@
+name: Build and Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Windows
+          - { os: windows-latest, arch: x64,   rid: win-x64,   output_path: build/Release/uv.dll, file-name: libuv.dll, cmake_args: '-A x64' }
+          - { os: windows-latest, arch: Win32, rid: win-x86,   output_path: build/Release/uv.dll, file-name: libuv.dll, cmake_args: '-A Win32' }
+          - { os: windows-latest, arch: arm64, rid: win-arm64, output_path: build/Release/uv.dll, file-name: libuv.dll, cmake_args: '-A arm64' }
+          
+          # Linux (Ubuntu builds generic .so)
+          - { os: ubuntu-latest,  arch: x64,   rid: linux-x64, output_path: build/libuv.so, file-name: libuv.so }
+          - { os: ubuntu-latest,  arch: arm64, rid: linux-arm64, output_path: build/libuv.so, file-name: libuv.so, cmake_args: '-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc' }
+
+          # macOS (Universal binary or specific)
+          - { os: macos-latest,   arch: x64,   rid: osx-x64,   output_path: build/libuv.dylib, file-name: libuv.dylib, cmake_args: '-DCMAKE_OSX_ARCHITECTURES=x86_64' }
+          - { os: macos-latest,   arch: arm64, rid: osx-arm64, output_path: build/libuv.dylib, file-name: libuv.dylib, cmake_args: '-DCMAKE_OSX_ARCHITECTURES=arm64' }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install ARM Cross-Compiler
+        if: matrix.rid == 'linux-arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Build Project
+        uses: threeal/cmake-action@v2.1.0
+        with:
+          source-dir: libuv
+          build-dir: build
+          args: ${{ matrix.cmake_args }} -DBUILD_TESTING=OFF
+          build-args: '--config Release'
+
+      - name: Prepare Artifact Directory
+        shell: bash
+        run: |
+          mkdir -p staging/${{ matrix.rid }}/native
+          cp ${{ matrix.output_path }} staging/${{ matrix.rid }}/native/${{ matrix.file_name }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          # We name the artifact after the RID
+          name: ${{ matrix.rid }}
+          # We only upload the contents of the staging folder for this specific RID
+          path: staging/

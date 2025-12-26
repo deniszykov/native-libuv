@@ -1,4 +1,4 @@
-name: Update libuv Submodule
+name: Update Submodule
 
 on:
   schedule:
