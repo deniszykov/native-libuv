@@ -1,14 +1,13 @@
 name: Build and Publish
 
-on:
+on: 
   push:
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - v*
 
 jobs:
   build-windows:
-    name: Build on ${{ matrix.os }}
+    name: Build on ${{ matrix.os }} (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -58,3 +57,4 @@ jobs:
           name: ${{ matrix.rid }}
           # We only upload the contents of the staging folder for this specific RID
           path: staging/
+          retention-days: 30
